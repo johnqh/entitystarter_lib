@@ -53,7 +53,7 @@ export interface HistoriesStoreState {
    * @param userId - The user's unique identifier
    * @param histories - The full list of histories to cache
    */
-  setHistories: (userId: string, histories: History[]) => void;
+  setHistories: (entitySlug: string, histories: History[]) => void;
 
   /**
    * Retrieves the cached histories for a user.
@@ -63,7 +63,7 @@ export interface HistoriesStoreState {
    * @param maxAge - Maximum cache age in milliseconds (default: {@link DEFAULT_CACHE_EXPIRATION_MS})
    * @returns The cached history array, or `undefined` if missing or expired
    */
-  getHistories: (userId: string, maxAge?: number) => History[] | undefined;
+  getHistories: (entitySlug: string, maxAge?: number) => History[] | undefined;
 
   /**
    * Retrieves the full cache entry (histories + metadata) for a user.
@@ -74,7 +74,7 @@ export interface HistoriesStoreState {
    * @returns The cache entry, or `undefined` if missing or expired
    */
   getCacheEntry: (
-    userId: string,
+    entitySlug: string,
     maxAge?: number
   ) => HistoriesCacheEntry | undefined;
 
@@ -85,7 +85,7 @@ export interface HistoriesStoreState {
    * @param userId - The user's unique identifier
    * @param history - The history entry to append
    */
-  addHistory: (userId: string, history: History) => void;
+  addHistory: (entitySlug: string, history: History) => void;
 
   /**
    * Replaces a specific history entry in a user's cache by ID.
@@ -95,7 +95,11 @@ export interface HistoriesStoreState {
    * @param historyId - The ID of the history entry to replace
    * @param history - The updated history entry
    */
-  updateHistory: (userId: string, historyId: string, history: History) => void;
+  updateHistory: (
+    entitySlug: string,
+    historyId: string,
+    history: History
+  ) => void;
 
   /**
    * Removes a specific history entry from a user's cache by ID.
@@ -104,7 +108,7 @@ export interface HistoriesStoreState {
    * @param userId - The user's unique identifier
    * @param historyId - The ID of the history entry to remove
    */
-  removeHistory: (userId: string, historyId: string) => void;
+  removeHistory: (entitySlug: string, historyId: string) => void;
 
   /**
    * Removes all expired cache entries from the store.
@@ -157,11 +161,11 @@ const isCacheExpired = (
 export const useHistoriesStore = create<HistoriesStoreState>((set, get) => ({
   cache: {},
 
-  setHistories: (userId: string, histories: History[]) =>
+  setHistories: (entitySlug: string, histories: History[]) =>
     set(state => ({
       cache: {
         ...state.cache,
-        [userId]: {
+        [entitySlug]: {
           histories,
           cachedAt: Date.now(),
         },
@@ -169,33 +173,33 @@ export const useHistoriesStore = create<HistoriesStoreState>((set, get) => ({
     })),
 
   getHistories: (
-    userId: string,
+    entitySlug: string,
     maxAge: number = DEFAULT_CACHE_EXPIRATION_MS
   ) => {
-    const entry = get().cache[userId];
+    const entry = get().cache[entitySlug];
     if (!entry) return undefined;
     if (isCacheExpired(entry, maxAge)) return undefined;
     return entry.histories;
   },
 
   getCacheEntry: (
-    userId: string,
+    entitySlug: string,
     maxAge: number = DEFAULT_CACHE_EXPIRATION_MS
   ) => {
-    const entry = get().cache[userId];
+    const entry = get().cache[entitySlug];
     if (!entry) return undefined;
     if (isCacheExpired(entry, maxAge)) return undefined;
     return entry;
   },
 
-  addHistory: (userId: string, history: History) =>
+  addHistory: (entitySlug: string, history: History) =>
     set(state => {
-      const existing = state.cache[userId];
+      const existing = state.cache[entitySlug];
       if (!existing) {
         return {
           cache: {
             ...state.cache,
-            [userId]: {
+            [entitySlug]: {
               histories: [history],
               cachedAt: Date.now(),
             },
@@ -205,7 +209,7 @@ export const useHistoriesStore = create<HistoriesStoreState>((set, get) => ({
       return {
         cache: {
           ...state.cache,
-          [userId]: {
+          [entitySlug]: {
             histories: [...existing.histories, history],
             cachedAt: Date.now(),
           },
@@ -213,14 +217,14 @@ export const useHistoriesStore = create<HistoriesStoreState>((set, get) => ({
       };
     }),
 
-  updateHistory: (userId: string, historyId: string, history: History) =>
+  updateHistory: (entitySlug: string, historyId: string, history: History) =>
     set(state => {
-      const existing = state.cache[userId];
+      const existing = state.cache[entitySlug];
       if (!existing) return state;
       return {
         cache: {
           ...state.cache,
-          [userId]: {
+          [entitySlug]: {
             histories: existing.histories.map(h =>
               h.id === historyId ? history : h
             ),
@@ -230,14 +234,14 @@ export const useHistoriesStore = create<HistoriesStoreState>((set, get) => ({
       };
     }),
 
-  removeHistory: (userId: string, historyId: string) =>
+  removeHistory: (entitySlug: string, historyId: string) =>
     set(state => {
-      const existing = state.cache[userId];
+      const existing = state.cache[entitySlug];
       if (!existing) return state;
       return {
         cache: {
           ...state.cache,
-          [userId]: {
+          [entitySlug]: {
             histories: existing.histories.filter(h => h.id !== historyId),
             cachedAt: Date.now(),
           },
@@ -249,9 +253,9 @@ export const useHistoriesStore = create<HistoriesStoreState>((set, get) => ({
     set(state => {
       const now = Date.now();
       const newCache: Record<string, HistoriesCacheEntry> = {};
-      for (const [userId, entry] of Object.entries(state.cache)) {
+      for (const [key, entry] of Object.entries(state.cache)) {
         if (now - entry.cachedAt <= maxAge) {
-          newCache[userId] = entry;
+          newCache[key] = entry;
         }
       }
       return { cache: newCache };

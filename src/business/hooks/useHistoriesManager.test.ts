@@ -45,6 +45,7 @@ const { useHistoriesManager } = await import('./useHistoriesManager');
 const makeHistory = (overrides: Partial<History> = {}): History => ({
   id: 'hist-1',
   user_id: 'user-1',
+  entity_id: 'entity-1',
   datetime: '2024-01-01T00:00:00Z',
   value: 100,
   created_at: '2024-01-01T00:00:00Z',
@@ -60,7 +61,7 @@ const defaultConfig: UseHistoriesManagerConfig = {
     put: vi.fn(),
     delete: vi.fn(),
   },
-  userId: 'user-1',
+  entitySlug: 'user-1',
   token: 'mock-token',
   autoFetch: false,
 };
@@ -397,10 +398,10 @@ describe('useHistoriesManager', () => {
       ).rejects.toThrow('Forbidden');
     });
 
-    it('mutations should not update store when userId is null', async () => {
+    it('mutations should not update store when entitySlug is null', async () => {
       const configNoUser: UseHistoriesManagerConfig = {
         ...defaultConfig,
-        userId: null,
+        entitySlug: null,
       };
 
       const newHistory = makeHistory({ id: 'new-1' });
@@ -418,7 +419,7 @@ describe('useHistoriesManager', () => {
         });
       });
 
-      // Store should not have any entries because userId is null
+      // Store should not have any entries because entitySlug is null
       expect(useHistoriesStore.getState().cache).toEqual({});
     });
   });
@@ -458,12 +459,12 @@ describe('useHistoriesManager', () => {
       expect(mockUpdate).not.toHaveBeenCalled();
     });
 
-    it('should not call update when userId is null', () => {
+    it('should not call update when entitySlug is null', () => {
       renderHook(() =>
         useHistoriesManager({
           ...defaultConfig,
           autoFetch: true,
-          userId: null,
+          entitySlug: null,
         })
       );
 

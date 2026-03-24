@@ -7,7 +7,10 @@ import type {
   Optional,
 } from '@sudobility/entitystarter_types';
 import type { FirebaseIdToken } from '@sudobility/entitystarter_client';
-import { useHistories, useHistoriesTotal } from '@sudobility/entitystarter_client';
+import {
+  useHistories,
+  useHistoriesTotal,
+} from '@sudobility/entitystarter_client';
 import { useHistoriesStore } from '../stores/historiesStore';
 import { calculatePercentage } from '../utils/calculations';
 
@@ -36,10 +39,10 @@ export interface UseHistoriesManagerConfig {
   networkClient: NetworkClient;
 
   /**
-   * The Firebase UID of the authenticated user, or `null`/`undefined` when not logged in.
-   * Cache is isolated per user -- switching users shows a fresh state.
+   * The entity slug for scoping history data.
+   * Cache is isolated per entity -- switching entities shows different data.
    */
-  userId: Optional<string>;
+  entitySlug: Optional<string>;
 
   /**
    * A valid Firebase ID token for authentication, or `null`/`undefined` when not available.
@@ -51,11 +54,9 @@ export interface UseHistoriesManagerConfig {
   /**
    * Whether to automatically fetch histories on mount.
    *
-   * When `true` (default), the hook fetches data on mount if `token` and `userId`
+   * When `true` (default), the hook fetches data on mount if `token` and `entitySlug`
    * are present and no data has been loaded yet. A `useRef` guard prevents
    * duplicate fetches during React strict-mode double-mount.
-   *
-   * Set to `false` to control fetching manually via the `refresh` function.
    *
    * @defaultValue `true`
    */
@@ -212,7 +213,7 @@ export interface UseHistoriesManagerReturn {
 export const useHistoriesManager = ({
   baseUrl,
   networkClient,
-  userId,
+  entitySlug,
   token,
   autoFetch = true,
 }: UseHistoriesManagerConfig): UseHistoriesManagerReturn => {
@@ -227,7 +228,7 @@ export const useHistoriesManager = ({
     isCreating,
     isUpdating,
     isDeleting,
-  } = useHistories(networkClient, baseUrl, userId ?? null, token ?? null);
+  } = useHistories(networkClient, baseUrl, entitySlug ?? null, token ?? null);
 
   const {
     total,
@@ -236,7 +237,10 @@ export const useHistoriesManager = ({
   } = useHistoriesTotal(networkClient, baseUrl);
 
   const cacheEntry = useHistoriesStore(
-    useCallback(state => (userId ? state.cache[userId] : undefined), [userId])
+    useCallback(
+      state => (entitySlug ? state.cache[entitySlug] : undefined),
+      [entitySlug]
+    )
   );
   const setHistories = useHistoriesStore(state => state.setHistories);
   const addHistoryToStore = useHistoriesStore(state => state.addHistory);
@@ -263,13 +267,13 @@ export const useHistoriesManager = ({
   useEffect(() => {
     if (
       clientHistories.length > 0 &&
-      userId &&
+      entitySlug &&
       clientHistories !== prevClientHistoriesRef.current
     ) {
       prevClientHistoriesRef.current = clientHistories;
-      setHistories(userId, clientHistories);
+      setHistories(entitySlug, clientHistories);
     }
-  }, [clientHistories, userId, setHistories]);
+  }, [clientHistories, entitySlug, setHistories]);
 
   // Calculate percentage using the extracted utility
   const percentage = useMemo(
@@ -280,40 +284,40 @@ export const useHistoriesManager = ({
   const createHistory = useCallback(
     async (data: HistoryCreateRequest): Promise<void> => {
       const response = await clientCreate(data);
-      if (response.success && response.data && userId) {
-        addHistoryToStore(userId, response.data);
+      if (response.success && response.data && entitySlug) {
+        addHistoryToStore(entitySlug, response.data);
       }
       if (!response.success) {
         throw new Error(response.error || 'Failed to create history');
       }
     },
-    [clientCreate, userId, addHistoryToStore]
+    [clientCreate, entitySlug, addHistoryToStore]
   );
 
   const updateHistory = useCallback(
     async (historyId: string, data: HistoryUpdateRequest): Promise<void> => {
       const response = await clientUpdate(historyId, data);
-      if (response.success && response.data && userId) {
-        updateHistoryInStore(userId, historyId, response.data);
+      if (response.success && response.data && entitySlug) {
+        updateHistoryInStore(entitySlug, historyId, response.data);
       }
       if (!response.success) {
         throw new Error(response.error || 'Failed to update history');
       }
     },
-    [clientUpdate, userId, updateHistoryInStore]
+    [clientUpdate, entitySlug, updateHistoryInStore]
   );
 
   const deleteHistory = useCallback(
     async (historyId: string): Promise<void> => {
       const response = await clientDelete(historyId);
-      if (response.success && userId) {
-        removeHistoryFromStore(userId, historyId);
+      if (response.success && entitySlug) {
+        removeHistoryFromStore(entitySlug, historyId);
       }
       if (!response.success) {
         throw new Error(response.error || 'Failed to delete history');
       }
     },
-    [clientDelete, userId, removeHistoryFromStore]
+    [clientDelete, entitySlug, removeHistoryFromStore]
   );
 
   const isLoading =
@@ -326,14 +330,14 @@ export const useHistoriesManager = ({
     if (
       autoFetch &&
       token &&
-      userId &&
+      entitySlug &&
       histories.length === 0 &&
       !hasAttemptedFetchRef.current
     ) {
       hasAttemptedFetchRef.current = true;
       update();
     }
-  }, [autoFetch, token, userId, histories.length, update]);
+  }, [autoFetch, token, entitySlug, histories.length, update]);
 
   useEffect(() => {
     hasAttemptedFetchRef.current = false;
